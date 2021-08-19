@@ -21,7 +21,12 @@ async function update_record(notion, page_id, new_values) {
 };
 
 
-async function get_block(notion, block_id, get_subblocks=false) { // also works with pages/records
+async function get_record(notion, page_id) {
+	const response = await notion.pages.retrieve({ page_id: page_id });
+	return response;
+};
+
+async function get_block(notion, block_id, get_subblocks=false) { 
 	// retrieves all properties *and* the corresponding content
 	// set get_subblocks to true if you also want to get the contents of the subblock(s) in the block
 	const response = await notion.blocks.retrieve({
@@ -47,5 +52,6 @@ module.exports = {
 	course_types_id: "daab30bf6f7445228189a4dc416d7e6a",
 	get_records: get_records,
 	update_record : update_record,
-	get_block : get_block
+	get_block : get_block,
+	get_record : get_record
 };
