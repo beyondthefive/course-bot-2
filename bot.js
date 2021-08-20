@@ -49,15 +49,32 @@ async function update_student_perms_and_roles(response) {
 
 		student_id = student.properties['Discord ID'].rich_text[0].plain_text
 
-		var channel_ids = []; // channel IDs
+		var channel_id_promises = []; 
 		// since the channel IDs in the Students database are from the Courses database, we have to grab the channel IDs from that database
 		for (c of student.properties['Courses'].relation) { 
 			r = notion_utils.get_record(notion, c.id);
-			r.then(response => channel_ids.push(response.properties['Channel ID'].rich_text[0].plain_text));
+			channel_id_promises.push(r);
 		};
 
-		discord_utils.update_channel_perms(client, student_id, channel_ids, { VIEW_CHANNEL: true, SEND_MESSAGES : true});
-		discord_utils.add_role(client, student_id, "new role"); // change to "Enrolled" before actually deploying
+
+		const all_channels_promise = Promise.all(channel_id_promises);
+		all_channels_promise.then((response) => {
+			channel_ids = [];
+			for(r of response) {
+				channel_ids.push(r.properties['Channel ID'].rich_text[0].plain_text);
+			};
+
+			discord_utils.update_channel_perms(client, student_id, channel_ids, { VIEW_CHANNEL: true, SEND_MESSAGES : true});
+			discord_utils.check_for_role(client, student_id, discord_utils.enrolled_id).then((has_role) => {
+				if(!has_role) { // checking for role first
+				discord_utils.add_role(client, student_id, discord_utils.enrolled_id); 
+				};
+			});
+			console.log(`Successfully updated ${student_id}`); // temporary
+			
+		});
+
+		
 	};
 }
 
@@ -67,6 +84,9 @@ notes:
 - databases contain pages (referred to as records here)
 - "short bursts" of requests are allowed by the api -> tried 25-ish req/second for 5-ish seconds, seemed fine
 - to change before deploying:
-	- change all instances of "new role" to "Enrolled"
 	- update guild_id in discord_utils
+	- update enrolled_id in discord_utils
+- TODO:
+	- add logging and error handling + other QOL additions
+	- optimize
 */

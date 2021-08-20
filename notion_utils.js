@@ -21,7 +21,7 @@ async function update_record(notion, page_id, new_values) {
 };
 
 
-async function get_record(notion, page_id) {
+async function get_record(notion, page_id) { // where student is a page object
 	const response = await notion.pages.retrieve({ page_id: page_id });
 	return response;
 };
