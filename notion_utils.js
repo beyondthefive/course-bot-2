@@ -21,9 +21,9 @@ async function update_record(notion, page_id, new_values) {
 };
 
 
-async function get_record(notion, page_id) { // where student is a page object
+async function get_record(notion, page_id, student) { // where student is a page object
 	const response = await notion.pages.retrieve({ page_id: page_id });
-	return response;
+	return [response, student];
 };
 
 async function get_block(notion, block_id, get_subblocks=false) { 
@@ -48,7 +48,7 @@ async function get_block(notion, block_id, get_subblocks=false) {
 module.exports = {
 	students_id: "3fa8f9caeccd42a1ad5125193c9aa300",
 	instructors: "84103a7ceaac47288c73010520bbed0b",
-	courses_id: "dd8b86ffaaa9481482dbe75328e51584",
+	courses_id: "75c3e78c93a04ba0828d4649ca51c49d",
 	course_types_id: "daab30bf6f7445228189a4dc416d7e6a",
 	get_records: get_records,
 	update_record : update_record,
