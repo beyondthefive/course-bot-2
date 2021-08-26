@@ -2,6 +2,7 @@ const { Client : DiscordClient, Collection, Intents, Guild, GuildMember, Permiss
 
 const guild_id = "876513971191046194";
 const enrolled_id = "877798118094143519";
+const teacher_id = "879962880559181916";
 
 async function update_channel_perms(client, uid, channel_ids, all_channel_ids, perms) { 
 	// channel_ids is an arr containing the channel IDs of the courses they should be in
@@ -40,10 +41,18 @@ async function check_for_role(client, uid, role_id) {
 	return member._roles.includes(role_id);
 };
 
+async function get_user_from_id(client, uid) {
+	guild = await client.guilds.fetch(guild_id);
+	member = await guild.members.fetch(uid);
+	return `${member.user.tag}`;
+};
+
 module.exports = {
 	update_channel_perms : update_channel_perms,
 	add_role : add_role,
 	check_for_role : check_for_role,
+	get_user_from_id : get_user_from_id,
 	guild_id : guild_id,
-	enrolled_id : enrolled_id 
+	enrolled_id : enrolled_id,
+	teacher_id : teacher_id
 };
