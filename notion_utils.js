@@ -26,6 +26,12 @@ async function get_record(notion, page_id, page1, page2) { // where page1 and pa
 	return [response, page1, page2];
 };
 
+async function get_record_only(notion, page_id) { // where page1 and page2 are page objects (i.e. student and instructor page)
+	const response = await notion.pages.retrieve({ page_id: page_id });
+	return response;
+};
+
+
 async function get_block(notion, block_id, get_subblocks=false) { 
 	// retrieves all properties *and* the corresponding content
 	// set get_subblocks to true if you also want to get the contents of the subblock(s) in the block
@@ -38,7 +44,7 @@ async function get_block(notion, block_id, get_subblocks=false) {
 			block_id : block_id,
 			page_size : 100 // max page size
 		}); // further nested subblocks have to be retrieved recursively, will do later
-		return response, subblocks;
+		return [response, subblocks];
 	} else {
 		return response;
 	};
@@ -49,7 +55,7 @@ module.exports = {
 	students_id: "3fa8f9caeccd42a1ad5125193c9aa300",
 	instructors_id: "84103a7ceaac47288c73010520bbed0b",
 	courses_id: "75c3e78c93a04ba0828d4649ca51c49d",
-	course_types_id: "daab30bf6f7445228189a4dc416d7e6a",
+	subjects_id: "daab30bf6f7445228189a4dc416d7e6a",
 	get_records: get_records,
 	update_record : update_record,
 	get_block : get_block,
