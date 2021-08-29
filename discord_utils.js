@@ -54,6 +54,12 @@ async function get_id_from_user(client, username) {
 
 };
 
+async function send_message_to_channel(client, channel_id, msg) {
+	guild = await client.guilds.fetch(guild_id);
+	channel = await guild.channels.fetch(channel_id);
+	channel.send(msg);
+};
+
 
 
 
@@ -65,5 +71,6 @@ module.exports = {
 	get_id_from_user : get_id_from_user,
 	guild_id : guild_id,
 	enrolled_id : enrolled_id,
-	teacher_id : teacher_id
+	teacher_id : teacher_id,
+	log_channel_id : "880335228000931891"
 };

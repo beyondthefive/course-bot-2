@@ -19,6 +19,7 @@ client.login(process.env.token);
 
 const all_dept_channel_ids = ["878142767342190612", "878142316555165736", "878142356170346527", "878142874485686303", "878142269771882527",
 "878142826804813855", "878143102139908146", "878143010674724924", "878143066379288596", "878143135283314739"];
+// temporary, will actually pull from the database later
 
 
 // get all records in both databases with the "NEED BOT TO UPDATE" property checked 
@@ -138,7 +139,7 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 					};
 				});
 				username = discord_utils.get_user_from_id(client, user_id);
-				username.then(str => console.log(`Successfully updated ${str}`)); // temporary
+				username.then(str => discord_utils.send_message_to_channel(`Successfully updated ${str}`)); // temporary
 			});
 		});
 	};
@@ -252,199 +253,6 @@ async function get_all_channels(all_courses) {
 
 	return all_courses_ids
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-async function update_student_perms_and_roles(all_courses, response) {
-	for (student of response.results) {
-		student_id = student.properties['Discord ID'].rich_text[0].plain_text
-
-		// addresses the case where the student is also an instructor by extending channel_ids (the channels that they should be in as a student)
-		// with the channels that they should be in as an instructor
-		instructor = notion_utils.get_records(notion, notion_utils.instructors_id, 
-		{ 
-  	"property": "Discord ID",
-	  "text": {
-	    "equals": student_id
-			  }
-		  }
-		);
-		
-		instructor.then(function handle_instructor(instructor) {
-
-			student_id = student.properties['Discord ID'].rich_text[0].plain_text
-
-			handle_instructor.channel_ids = []
-			for (channel_id of student.properties['Course Channel IDs (Test)'].rollup.array) {
-				handle_instructor.channel_ids.push(channel_id.text[0].plain_text);
-			};
-	
-			handle_instructor.all_courses_ids = []; // an arr containing the ids of all of our courses
-			for (course of all_courses.results) {
-				handle_instructor.all_courses_ids.push(course.properties['Channel ID'].rich_text[0].plain_text);
-			};
-
-			if(instructor.results.length == 1) {
-					handle_instructor.instructor_channels = []
-					handle_instructor.dept_channel_ids = new Set();
-					filter = {
-						"or": [
-						]
-					};
-
-					for(ch_id of instructor.results[0].properties['Course Channel IDs (Test)'].rollup.array) {
-						handle_instructor.instructor_channels.push(ch_id.text[0].plain_text);
-						filter["or"].push({
-							"property" : "Channel ID",
-							"text" : {
-								"contains" : ch_id.text[0].plain_text
-							}
-						});
-					}
-					courses_in = notion_utils.get_records(notion, notion_utils.courses_id, filter=filter);
-
-					courses_in.then(courses_in => {
-						for(course of courses_in.results) {
-							for(dept_id of course.properties["Department Channel IDs"].rollup.array) {
-								handle_instructor.dept_channel_ids.add(dept_id.text[0].plain_text);			
-							};
-						};
-						handle_instructor.dept_channel_ids = Array.from(handle_instructor.dept_channel_ids);
-						handle_instructor.channel_ids.push(...handle_instructor.dept_channel_ids);
-						handle_instructor.channel_ids.push(...handle_instructor.instructor_channels);
-						handle_instructor.all_courses_ids.push(...all_dept_channel_ids);
-
-						channel_ids = handle_instructor.channel_ids;
-						all_courses_ids = handle_instructor.all_courses_ids;
-
-						discord_utils.update_channel_perms(client, student_id, channel_ids, all_courses_ids, { VIEW_CHANNEL: true, SEND_MESSAGES : true});
-						discord_utils.check_for_role(client, student_id, discord_utils.enrolled_id).then((has_role) => {
-							if(!has_role) { // checking for role first
-									discord_utils.add_role(client, student_id, discord_utils.enrolled_id); 
-									};
-								});
-						username = discord_utils.get_user_from_id(client, student_id);
-						username.then(str => console.log(`Successfully updated student ${str}`)); // temporary
-							});				
-			}
-			else
-			{
-				channel_ids = handle_instructor.channel_ids;
-				all_courses_ids = handle_instructor.all_courses_ids;
-				discord_utils.update_channel_perms(client, student_id, channel_ids, all_courses_ids, { VIEW_CHANNEL: true, SEND_MESSAGES : true});
-				discord_utils.check_for_role(client, student_id, discord_utils.enrolled_id).then((has_role) => {
-					if(!has_role) { // checking for role first
-							discord_utils.add_role(client, student_id, discord_utils.enrolled_id); 
-							};
-						});
-				username = discord_utils.get_user_from_id(client, student_id);
-				username.then(str => console.log(`Successfully updated student ${str}`)); // temporary
-			};
-
-
-		});
-	};
-};
-
-async function update_instructor_perms_and_roles(all_courses, response) {
-	for (instructor of response.results) {
-
-		instructor_id = instructor.properties['Discord ID'].rich_text[0].plain_text;
-
-		student = notion_utils.get_records(notion, notion_utils.students_id, 
-		{ 
-  	"property": "Discord ID",
-	  "text": {
-	    "equals": instructor_id
-			  }
-		  }
-		);
-
-		student.then(student => {
-			
-
-			filter = {
-				"or": [
-				]
-			}
-
-			// dept channels: bruh ok, you'll just have to grab the department channel ids from *every* course channel that this user should be in
-			// as an INSTRUCTOR
-
-			channel_ids = [];
-			// this simulataneously grabs the channel IDs that they should be in as an instructor and adds to the compound filter used
-			// to grab dept channel IDs (can't use the rollup in Instructors bc it contains relations)
-			for (channel_id of instructor.properties['Course Channel IDs (Test)'].rollup.array) { 
-				channel_ids.push(channel_id.text[0].plain_text);				
-				filter["or"].push({
-					"property" : "Channel ID",
-					"text" : {
-						"contains" : channel_id.text[0].plain_text
-					}
-				});
-
-			};
-
-			courses_in = notion_utils.get_records(notion, notion_utils.courses_id, filter=filter);
-			courses_in.then(courses_in => {
-
-				all_courses_ids = []; // an arr containing the ids of all of our courses
-				for (course of all_courses.results) {
-					all_courses_ids.push(course.properties['Channel ID'].rich_text[0].plain_text);
-				};
-
-				dept_channel_ids = new Set();
-				for(course of courses_in.results) {
-					for(dept_id of course.properties["Department Channel IDs"].rollup.array) {
-						dept_channel_ids.add(dept_id.text[0].plain_text);
-					};
-				};
-				dept_channel_ids = Array.from(dept_channel_ids);
-
-				channel_ids.push(...dept_channel_ids);
-				all_courses_ids.push(...all_dept_channel_ids);
-
-				if(student.results.length == 1) {
-						student_channels = []
-						for(ch_id of student.results[0].properties['Course Channel IDs (Test)'].rollup.array) {
-							student_channels.push(ch_id.text[0].plain_text);
-						}
-						channel_ids.push(...student_channels);
-				}
-				
-
-				discord_utils.update_channel_perms(client, instructor_id, channel_ids, all_courses_ids, { VIEW_CHANNEL: true, SEND_MESSAGES : true, MANAGE_MESSAGES : true});
-				discord_utils.check_for_role(client, instructor_id, discord_utils.teacher_id).then((has_role) => {
-					if(!has_role) { // checking for role first
-					discord_utils.add_role(client, instructor_id, discord_utils.teacher_id); 
-					};
-				});
-				username = discord_utils.get_user_from_id(client, instructor_id);
-				username.then(str => console.log(`Successfully updated instructor ${str}`)); // temporary
-
-			});
-
-		});		
-
-	};
-	
-};
-
-
 
 
 
