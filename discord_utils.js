@@ -69,6 +69,7 @@ module.exports = {
 	check_for_role : check_for_role,
 	get_user_from_id : get_user_from_id,
 	get_id_from_user : get_id_from_user,
+	send_message_to_channel : send_message_to_channel,
 	guild_id : guild_id,
 	enrolled_id : enrolled_id,
 	teacher_id : teacher_id,

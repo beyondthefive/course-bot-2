@@ -30,6 +30,7 @@ setInterval(update_users, 5000, notion, notion_utils.instructors_id, "Instructor
 
 // user_type is either "Instructors" or "Students"
 async function update_users(notion, database_id, user_type) {
+		try {
 		all_courses = notion_utils.get_records(notion, notion_utils.courses_id);
 
 		if(user_type == "Students") {
@@ -77,11 +78,16 @@ async function update_users(notion, database_id, user_type) {
 			});
 		}; 
 	});
+	}
+	catch(err) {
+		discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, "Encountered Notion rate limit or timed out");
+	};
 }; 
 
 
 async function update_perms_and_roles(all_courses, response, database_id, user_type) {
 	for (user of response.results) {
+		try {
 
 		// address the following cases:
 		// 1. no id, invalid username (shouldn't happen, but you should handle anyway by replacing the username with "NEEDS TO BE UPDATED" or smth)
@@ -139,13 +145,19 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 					};
 				});
 				username = discord_utils.get_user_from_id(client, user_id);
-				username.then(str => discord_utils.send_message_to_channel(`Successfully updated ${str}`)); // temporary
+				username.then(str => discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Successfully updated ${str}`)); // temporary
 			});
 		});
+		}
+		catch(err) {
+			discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Failed to update record ${user.id} in ${user_type}`);
+		}
 	};
 };
 
 async function get_channels_to_be_in(user, user_type, other_record=undefined) {
+	try {
+
 	get_channels_to_be_in.channel_ids = [];
 	for (channel_id of user.properties['Course Channel IDs (Test)'].rollup.array) { 
 		get_channels_to_be_in.channel_ids.push(channel_id.text[0].plain_text);
@@ -236,8 +248,10 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 			return get_channels_to_be_in.channel_ids;
 		});
 		return return_list;
-
-
+	};
+	}
+	catch(err) {
+		discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Encountered error while retrieving channel IDs for record ${user.id} in ${user_type}`);
 	};
 };
 
