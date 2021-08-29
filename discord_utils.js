@@ -47,11 +47,22 @@ async function get_user_from_id(client, uid) {
 	return `${member.user.tag}`;
 };
 
+async function get_id_from_user(client, username) {
+	guild = await client.guilds.fetch(guild_id);
+	uid = await guild.members.search({query : username});
+	return uid;
+
+};
+
+
+
+
 module.exports = {
 	update_channel_perms : update_channel_perms,
 	add_role : add_role,
 	check_for_role : check_for_role,
 	get_user_from_id : get_user_from_id,
+	get_id_from_user : get_id_from_user,
 	guild_id : guild_id,
 	enrolled_id : enrolled_id,
 	teacher_id : teacher_id
