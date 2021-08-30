@@ -49,9 +49,20 @@ async function get_user_from_id(client, uid) {
 
 async function get_id_from_user(client, username) {
 	guild = await client.guilds.fetch(guild_id);
-	uid = await guild.members.search({query : username});
-	return uid;
+	uid = await guild.members.search({query : username.substring(0, username.length-5)});
 
+	results = [...uid.values()];
+
+	user_id = "Not Found";
+
+	for(res of results) {
+		if(res.user.discriminator == username.substring(username.length-4, username.length)) {
+			user_id = res.user.id; 
+		}
+	};
+
+	return user_id;
+ 
 };
 
 async function send_message_to_channel(client, channel_id, msg) {
@@ -73,5 +84,7 @@ module.exports = {
 	guild_id : guild_id,
 	enrolled_id : enrolled_id,
 	teacher_id : teacher_id,
-	log_channel_id : "880335228000931891"
+	log_channel_id : "880335228000931891",
+	all_dept_channel_ids : ["878142767342190612", "878142316555165736", "878142356170346527", "878142874485686303", "878142269771882527",
+"878142826804813855", "878143102139908146", "878143010674724924", "878143066379288596", "878143135283314739"] // temporary, will actually pull from the database later
 };

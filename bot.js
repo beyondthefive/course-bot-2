@@ -2,7 +2,7 @@ const { Client : DiscordClient, Collection, Intents, Guild, GuildMember, Permiss
 const { Client : NotionClient} = require("@notionhq/client");
 const winston = require('winston'); // (error) logging!
 const notion_utils = require('./notion_utils');
-const discord_utils = require('./discord_utils')
+const discord_utils = require('./discord_utils');
 const fs = require('fs');
 require('dotenv').config();
 
@@ -14,13 +14,9 @@ const notion = new NotionClient({
 const client = new DiscordClient({ intents: [Intents.FLAGS.GUILDS] });
 client.once('ready', () => {
 	console.log('Ready!');
+	client.user.setActivity('beyondthefive.org', { type: 'WATCHING' });
 });
 client.login(process.env.token);
-
-const all_dept_channel_ids = ["878142767342190612", "878142316555165736", "878142356170346527", "878142874485686303", "878142269771882527",
-"878142826804813855", "878143102139908146", "878143010674724924", "878143066379288596", "878143135283314739"];
-// temporary, will actually pull from the database later
-
 
 // get all records in both databases with the "NEED BOT TO UPDATE" property checked 
 // -> update channel permissions and add roles as necessary -> uncheck
@@ -89,12 +85,44 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 	for (user of response.results) {
 		try {
 
-		// address the following cases:
-		// 1. no id, invalid username (shouldn't happen, but you should handle anyway by replacing the username with "NEEDS TO BE UPDATED" or smth)
-		// 2. no id, valid username (just grab using username)
-		// 3. valid id, invalid username (grab username)
+		user_id = "Default Value";
+		username = user.properties['Discord Username'].rich_text[0].plain_text;
+		if(user.properties['Discord ID'].rich_text.length == 0 && user.properties['Valid Discord Username'].checkbox == true) {
 
-		user_id = user.properties['Discord ID'].rich_text[0].plain_text;
+			id = await discord_utils.get_id_from_user(client, username); // actually nvm just do the search and match in this function
+
+			if(id == "Not Found") {
+				discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
+				continue;
+			}
+			else {
+				notion_utils.update_record(notion, user.id, {
+				"Discord ID" : {
+					rich_text: [
+						{
+							text: 
+							{
+								content: String(id),
+								link: null
+							},
+							plain_text: String(id)
+						}
+					]
+				}
+			});
+				user_id = id;
+			};
+		}
+		else if (user.properties['Discord ID'].rich_text.length == 0) {
+			discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
+			continue;
+		};
+		
+		// THEN GRAB USERNAME BY ID HERE AND UPDATE THE CORRESPONDING PROPERTY IN NOTION
+
+		if(user_id == "Default Value") {
+			user_id = user.properties['Discord ID'].rich_text[0].plain_text;
+		}
 
 		// addresses the case where the user is also in the other database by extending channel_ids 
 		// (the channels that they should be in as a user_type) with
@@ -121,7 +149,6 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		);
 		other_record.then(async function handle_other(other_record) {
 
-			user_id = user.properties['Discord ID'].rich_text[0].plain_text;
 			if(other_record.results.length == 1) {
 				p1 = get_channels_to_be_in(user, user_type, other_record=other_record);
 				p2 = get_all_channels(all_courses);
@@ -144,8 +171,9 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 							discord_utils.add_role(client, user_id, role); 
 					};
 				});
-				username = discord_utils.get_user_from_id(client, user_id);
-				username.then(str => discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Successfully updated ${str}`)); // temporary
+				//username = discord_utils.get_user_from_id(client, user_id);
+				//username.then(str => discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Successfully updated ${str}`)); 
+
 			});
 		});
 		}
@@ -263,27 +291,9 @@ async function get_all_channels(all_courses) {
 		all_courses_ids.push(course.properties['Channel ID'].rich_text[0].plain_text);
 	};
 	
-	all_courses_ids.push(...all_dept_channel_ids);
+	all_courses_ids.push(...discord_utils.all_dept_channel_ids);
 
 	return all_courses_ids
 };
 
 
-
-
-/*
-notes:
-- a page is a type of block that can contain other blocks
-- databases contain pages (referred to as records here)
-- "short bursts" of requests are allowed by the api -> tried 25-ish req/second for 5-ish seconds, seemed fine
-- to change before deploying:
-	- update guild_id in discord_utils
-	- update enrolled_id in discord_utils
-	- Courses (Test) + Courses page ID + Course Channel IDs (Test) (not changed yet)
-	- change any other IDs/property names/etc that you forgot abt
-	- remove all test properties from notion
-- TODO:
-	- add logging and error handling + other QOL additions
-	- optimize
-	- combine the two sets of async functions into one set (or not, idk)
-*/

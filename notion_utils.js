@@ -1,3 +1,5 @@
+const discord_utils = require('./discord_utils');
+
 async function get_records(notion, database_id, filter = undefined, sorts = undefined) { 
 	// filter (object, see docs) specifies which records to get (most common use case is getting only the records w/ the "NEED BOT TO UPDATE" property checked)
 	// sorts (array of sort objects, see docs) orders the pages in the returned object according to specified properties
@@ -20,16 +22,6 @@ async function update_record(notion, page_id, new_values) {
 	return response; 
 };
 
-
-async function get_record(notion, page_id, page1, page2) { // where page1 and page2 are page objects (i.e. student and instructor page)
-	const response = await notion.pages.retrieve({ page_id: page_id });
-	return [response, page1, page2];
-};
-
-async function get_record_only(notion, page_id) { // where page1 and page2 are page objects (i.e. student and instructor page)
-	const response = await notion.pages.retrieve({ page_id: page_id });
-	return response;
-};
 
 
 async function get_block(notion, block_id, get_subblocks=false) { 
@@ -58,6 +50,5 @@ module.exports = {
 	subjects_id: "daab30bf6f7445228189a4dc416d7e6a",
 	get_records: get_records,
 	update_record : update_record,
-	get_block : get_block,
-	get_record : get_record
+	get_block : get_block
 };
