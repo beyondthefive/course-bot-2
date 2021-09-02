@@ -13,6 +13,21 @@ async function get_records(notion, database_id, filter = undefined, sorts = unde
   return response;
 };
 
+// just for passing data into the .then() scope within a loop
+// hacky sol, will find a cleaner way to do this eventually
+async function get_records_with_other_data(notion, database_id, other_data, filter = undefined, sorts = undefined) { 
+	// filter (object, see docs) specifies which records to get (most common use case is getting only the records w/ the "NEED BOT TO UPDATE" property checked)
+	// sorts (array of sort objects, see docs) orders the pages in the returned object according to specified properties
+
+	// conditionally add properties to the request based on specified params
+  const response = await notion.databases.query({
+    database_id: database_id,
+    ...(!(filter == undefined) && {filter : filter}),
+    ...(!(sorts == undefined) && {sorts : sorts})
+  });
+  return [response, other_data];
+};
+
 async function update_record(notion, page_id, new_values) {
 	// new_values is an object that specifies each of the properties to be updated w/ their new values--see docs
 	const response = await notion.pages.update({
@@ -49,6 +64,7 @@ module.exports = {
 	courses_id: "75c3e78c93a04ba0828d4649ca51c49d",
 	subjects_id: "daab30bf6f7445228189a4dc416d7e6a",
 	get_records: get_records,
+	get_records_with_other_data: get_records_with_other_data,
 	update_record : update_record,
 	get_block : get_block
 };

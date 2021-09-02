@@ -4,16 +4,23 @@ const guild_id = "876513971191046194";
 const enrolled_id = "877798118094143519";
 const teacher_id = "879962880559181916";
 
-async function update_channel_perms(client, uid, channel_ids, all_channel_ids, perms) { 
+async function update_channel_perms(client, uid, channel_ids, all_channel_ids, perms, other_channel_ids=[], other_perms=undefined, dept_ids=[]) { 
 	// channel_ids is an arr containing the channel IDs of the courses they should be in
 	// all_channel_ids is an arr containing all of the course channel IDs (refreshed every 5s before updating perms)
+	dept_perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true};
 	guild = await client.guilds.fetch(guild_id);
 	member = await guild.members.fetch(uid);
 	for (id of all_channel_ids) {
 		channel = await guild.channels.fetch(id);
 		if(channel_ids.includes(id)) {
 			channel.permissionOverwrites.edit(member, perms); // what i think is the v12/v13 equivalent of channel.updateOverwrite()
-		} else {
+		} else if (other_channel_ids.includes(id) && typeof other_perms !== 'undefined'){
+			channel.permissionOverwrites.edit(member, other_perms);
+		}
+		else if (dept_ids.includes(id)) {
+			channel.permissionOverwrites.edit(member, dept_perms);
+		}
+		else {
 			try {
 				channel.permissionOverwrites.delete(member);
 			}

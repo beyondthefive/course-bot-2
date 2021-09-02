@@ -30,12 +30,22 @@ async function update_users(notion, database_id, user_type) {
 		all_courses = notion_utils.get_records(notion, notion_utils.courses_id);
 
 		if(user_type == "Students") {
-			checkboxes = { 
-	  	"property": "NEED BOT TO UPDATE",
-		  "checkbox": {
-		    "equals": true
-				  }
-			  }
+			checkboxes = {
+		  "and": [
+		    {
+		      "property": "NEED BOT TO UPDATE",
+		      "checkbox": {
+		        "equals": true
+		      }
+		    },
+		    {
+		      "property": "Application Status",
+		      "select": {
+		        "equals": "ACCEPTED"
+		      }
+		    }
+		  			]
+				}
 		}
 		else {
 			checkboxes = {
@@ -118,7 +128,6 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 			continue;
 		};
 		
-		// THEN GRAB USERNAME BY ID HERE AND UPDATE THE CORRESPONDING PROPERTY IN NOTION
 
 		if(user_id == "Default Value") {
 			user_id = user.properties['Discord ID'].rich_text[0].plain_text;
@@ -130,16 +139,18 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		if(user_type == "Students") {
 			other_id = notion_utils.instructors_id;
 			perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true};
+			other_perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true, MANAGE_MESSAGES : true};
 			role = discord_utils.enrolled_id;
 		}
 		else {
 			other_id = notion_utils.students_id;
 			perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true, MANAGE_MESSAGES : true};
+			other_perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true};
 			role = discord_utils.teacher_id;
 		};
 
 		// won't return anything if the user doesn't have a record in the other database
-		other_record = notion_utils.get_records(notion, other_id, 
+		other_record = notion_utils.get_records_with_other_data(notion, other_id, [user_id, perms, other_perms, role, user], 
 		{ 
   	"property": "Discord ID",
 	  "text": {
@@ -147,25 +158,58 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 			  }
 		  }
 		);
-		other_record.then(async function handle_other(other_record) {
+
+		other_record.then(async function handle_other(res) {
+
+			// hacky sol that i'll eventually clean up
+			other_record = res[0];
+			user_id = res[1][0];
+			perms = res[1][1];
+			other_perms = res[1][2];
+			role = res[1][3];
+			user = res[1][4];
 
 			if(other_record.results.length == 1) {
-				p1 = get_channels_to_be_in(user, user_type, other_record=other_record);
-				p2 = get_all_channels(all_courses);
-				lists_ready = Promise.all([p1, p2]);
+				channel_arr = await get_channels_to_be_in(user, user_type, other_record=other_record);
+				main = channel_arr[0];
+				others = channel_arr[1];
+				dept = channel_arr[2];
+				all_c = await get_all_channels(all_courses);
+				lists_ready = Promise.all([main, all_c, dept, others]);
 			}
-			else
-			{
-				p1 = get_channels_to_be_in(user, user_type);
-				p2 = get_all_channels(all_courses);
-				lists_ready = Promise.all([p1, p2]);
+			else if(user_type == "Instructors") {
+				channel_arr = await get_channels_to_be_in(user, user_type);
+				main = channel_arr[0];
+				dept = channel_arr[1];
+				all_c = await get_all_channels(all_courses);
+				lists_ready = Promise.all([main, all_c, dept]);
+			}
+			else if(user_type == "Students") {
+				channel_arr = await get_channels_to_be_in(user, user_type);
+				main = channel_arr[0];
+				lists_ready = Promise.all([main, all_c]);
 			};
+
 
 			lists_ready.then(arr => {
 				channel_ids = arr[0];
 				all_courses_ids = arr[1];
 
-				discord_utils.update_channel_perms(client, user_id, channel_ids, all_courses_ids, perms);
+				if(arr.length == 3) { // instructor but not a student
+					dept_ids = arr[2];
+					discord_utils.update_channel_perms(client, user_id, channel_ids, all_courses_ids, perms, dept_ids=dept_ids);
+				}
+				else if (arr.length == 4) { // instructor that's also a student or student that's also an instructor
+					dept_ids = arr[2];
+					other_channel_ids = arr[3];
+					discord_utils.update_channel_perms(client, user_id, channel_ids, all_courses_ids, perms, other_channel_ids=other_channel_ids, 
+						other_perms=other_perms, dept_ids=dept_ids);
+				}
+				else { // student but not an instructor
+					discord_utils.update_channel_perms(client, user_id, channel_ids, all_courses_ids, perms);
+				}
+
+				
 				discord_utils.check_for_role(client, user_id, role).then((has_role) => {
 					if(!has_role) { // checking for role first
 							discord_utils.add_role(client, user_id, role); 
@@ -178,7 +222,7 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		});
 		}
 		catch(err) {
-			discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Failed to update record ${user.id} in ${user_type}`);
+			discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Failed to update permissions for https://notion.so/bt5/${user.properties['First Name'].title[0].plain_text}-${user.id}`);
 		}
 	};
 };
@@ -220,16 +264,21 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 
 			dept_channel_ids = Array.from(dept_channel_ids);
 			
-			get_channels_to_be_in.channel_ids.push(...dept_channel_ids);
+			//get_channels_to_be_in.channel_ids.push(...dept_channel_ids);
 
 			if (typeof other_record !== 'undefined') { // add student channel ids here
 				student_channels = [];
 				for(ch_id of other_record.results[0].properties['Course Channel IDs (Test)'].rollup.array) {
 					student_channels.push(ch_id.text[0].plain_text);
 				};
-				get_channels_to_be_in.channel_ids.push(...student_channels);
+
+				//get_channels_to_be_in.channel_ids.push(...student_channels);
+				return [get_channels_to_be_in.channel_ids, student_channels, dept_channel_ids];
+			}
+			else {
+				return [get_channels_to_be_in.channel_ids, dept_channel_ids];
 			};
-			return get_channels_to_be_in.channel_ids;
+			
 		});
 		return return_list;
 	};
@@ -239,7 +288,7 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 		for(ch_id of other_record.results[0].properties['Course Channel IDs (Test)'].rollup.array) {
 			instructor_channels.push(ch_id.text[0].plain_text);
 		};
-		get_channels_to_be_in.channel_ids.push(...instructor_channels);
+		//get_channels_to_be_in.channel_ids.push(...instructor_channels);
 
 		// also get dept ids here
 		for (channel_id of other_record.results[0].properties['Course Channel IDs (Test)'].rollup.array) { 
@@ -262,9 +311,11 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 
 			dept_channel_ids = Array.from(dept_channel_ids);
 
+			//instructor_channels.push(...dept_channel_ids);
 
-			get_channels_to_be_in.channel_ids.push(...dept_channel_ids);
-			return get_channels_to_be_in.channel_ids;
+
+			//get_channels_to_be_in.channel_ids.push(...dept_channel_ids);
+			return [get_channels_to_be_in.channel_ids, instructor_channels, dept_channel_ids];
 		});
 
 		return return_list;
@@ -273,7 +324,7 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 	else if (user_type == "Students"){
 		courses_in = notion_utils.get_records(notion, notion_utils.courses_id, filter=filter);
 		return_list = courses_in.then(courses_in => { // can't have a plain return statement, so have to use some kind of promise
-			return get_channels_to_be_in.channel_ids;
+			return [get_channels_to_be_in.channel_ids];
 		});
 		return return_list;
 	};
