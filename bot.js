@@ -94,8 +94,44 @@ async function update_users(notion, database_id, user_type) {
 async function update_perms_and_roles(all_courses, response, database_id, user_type) {
 	for (user of response.results) {
 		try {
+
+		user_id = "Default Value";
+		username = user.properties['Discord Username'].rich_text[0].plain_text;
+		if(user.properties['Discord ID'].rich_text.length == 0 && user.properties['Valid Discord Username'].checkbox == true && user_type = "Instructor") {
+
+			id = await discord_utils.get_id_from_user(client, username); // actually nvm just do the search and match in this function
+
+			if(id == "Not Found") {
+				discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
+				continue;
+			}
+			else {
+				notion_utils.update_record(notion, user.id, {
+				"Discord ID" : {
+					rich_text: [
+						{
+							text: 
+							{
+								content: String(id),
+								link: null
+							},
+							plain_text: String(id)
+						}
+					]
+				}
+			});
+				user_id = id;
+			};
+		}
+		else if (user.properties['Discord ID'].rich_text.length == 0) {
+			discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
+			continue;
+		};
 		
-		user_id = user.properties['Discord ID'].rich_text[0].plain_text;
+
+		if(user_id == "Default Value") {
+			user_id = user.properties['Discord ID'].rich_text[0].plain_text;
+		}
 
 		// addresses the case where the user is also in the other database by extending channel_ids 
 		// (the channels that they should be in as a user_type) with
