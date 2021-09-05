@@ -12,13 +12,27 @@ async function update_channel_perms(client, uid, channel_ids, all_channel_ids, p
 	member = await guild.members.fetch(uid);
 	for (id of all_channel_ids) {
 		channel = await guild.channels.fetch(id);
-		if(channel_ids.includes(id)) {
-			channel.permissionOverwrites.edit(member, perms); // what i think is the v12/v13 equivalent of channel.updateOverwrite()
-		} else if (other_channel_ids.includes(id) && typeof other_perms !== 'undefined'){
-			channel.permissionOverwrites.edit(member, other_perms);
-		}
-		else if (dept_ids.includes(id)) {
-			channel.permissionOverwrites.edit(member, dept_perms);
+		// will clean up later
+		if(channel_ids.includes(id) || other_channel_ids.includes(id) || dept_ids.includes(id)) {
+			if(perms == { VIEW_CHANNEL: true, SEND_MESSAGES : true, MANAGE_MESSAGES : true}) {
+				if (other_channel_ids.includes(id) && typeof other_perms !== 'undefined'){
+					channel.permissionOverwrites.edit(member, other_perms);
+				}
+				if(channel_ids.includes(id)) {
+					channel.permissionOverwrites.edit(member, perms); // what i think is the v12/v13 equivalent of channel.updateOverwrite()
+				} 
+			}
+			else {
+				if(channel_ids.includes(id)) {
+					channel.permissionOverwrites.edit(member, perms); // what i think is the v12/v13 equivalent of channel.updateOverwrite()
+				} 
+				if (other_channel_ids.includes(id) && typeof other_perms !== 'undefined'){
+				channel.permissionOverwrites.edit(member, other_perms);
+				}
+			}
+			if (dept_ids.includes(id)) {
+				channel.permissionOverwrites.edit(member, dept_perms);
+			}
 		}
 		else {
 			try {
@@ -40,6 +54,13 @@ async function add_role(client, uid, role_id) {
 	member = await guild.members.fetch(uid);
 	role = await guild.roles.fetch(role_id);
 	member.roles.add(role);
+};
+
+async function remove_role(client, uid, role_id) {
+	guild = await client.guilds.fetch(guild_id);
+	member = await guild.members.fetch(uid);
+	role = await guild.roles.fetch(role_id);
+	member.roles.remove(role);
 };
 
 async function check_for_role(client, uid, role_id) {
@@ -84,6 +105,7 @@ async function send_message_to_channel(client, channel_id, msg) {
 module.exports = {
 	update_channel_perms : update_channel_perms,
 	add_role : add_role,
+	remove_role : remove_role,
 	check_for_role : check_for_role,
 	get_user_from_id : get_user_from_id,
 	get_id_from_user : get_id_from_user,

@@ -96,13 +96,13 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		try {
 
 		user_id = "Default Value";
-		username = user.properties['Discord Username'].rich_text[0].plain_text;
-		if(user.properties['Discord ID'].rich_text.length == 0 && user.properties['Valid Discord Username'].checkbox == true && user_type = "Instructor") {
-
+		if(user.properties['Discord ID'].rich_text.length == 0 && user.properties['Valid Discord Username'].checkbox == true && user_type == "Instructors") {
+			username = user.properties['Discord Username'].rich_text[0].plain_text;
 			id = await discord_utils.get_id_from_user(client, username); // actually nvm just do the search and match in this function
 
 			if(id == "Not Found") {
 				discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
+				console.log("1");
 				continue;
 			}
 			else {
@@ -125,6 +125,7 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		}
 		else if (user.properties['Discord ID'].rich_text.length == 0) {
 			discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
+			console.log("2");
 			continue;
 		};
 		
@@ -141,16 +142,18 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 			perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true};
 			other_perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true, MANAGE_MESSAGES : true};
 			role = discord_utils.enrolled_id;
+			other_role = discord_utils.teacher_id;
 		}
 		else {
 			other_id = notion_utils.students_id;
 			perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true, MANAGE_MESSAGES : true};
 			other_perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true};
 			role = discord_utils.teacher_id;
+			other_role = discord_utils.enrolled_id;
 		};
 
 		// won't return anything if the user doesn't have a record in the other database
-		other_record = notion_utils.get_records_with_other_data(notion, other_id, [user_id, perms, other_perms, role, user], 
+		other_record = notion_utils.get_records_with_other_data(notion, other_id, [user_id, perms, other_perms, role, other_role, user], 
 		{ 
   	"property": "Discord ID",
 	  "text": {
@@ -167,21 +170,22 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 			perms = res[1][1];
 			other_perms = res[1][2];
 			role = res[1][3];
-			user = res[1][4];
+			other_role = res[1][4];
+			user = res[1][5];
+
+			all_c = await get_all_channels(all_courses);
 
 			if(other_record.results.length == 1) {
 				channel_arr = await get_channels_to_be_in(user, user_type, other_record=other_record);
 				main = channel_arr[0];
 				others = channel_arr[1];
 				dept = channel_arr[2];
-				all_c = await get_all_channels(all_courses);
 				lists_ready = Promise.all([main, all_c, dept, others]);
 			}
 			else if(user_type == "Instructors") {
 				channel_arr = await get_channels_to_be_in(user, user_type);
 				main = channel_arr[0];
 				dept = channel_arr[1];
-				all_c = await get_all_channels(all_courses);
 				lists_ready = Promise.all([main, all_c, dept]);
 			}
 			else if(user_type == "Students") {
@@ -215,6 +219,13 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 							discord_utils.add_role(client, user_id, role); 
 					};
 				});
+				discord_utils.check_for_role(client, user_id, other_role).then((has_role) => {
+					if(has_role && (arr.length == 3 || arr.length == 2)) { // removes role if their record was deleted
+							discord_utils.remove_role(client, user_id, other_role); 
+					};
+				});
+
+
 				//username = discord_utils.get_user_from_id(client, user_id);
 				//username.then(str => discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Successfully updated ${str}`)); 
 
@@ -222,7 +233,13 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		});
 		}
 		catch(err) {
-			discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Failed to update permissions for https://notion.so/bt5/${user.properties['First Name'].title[0].plain_text}-${user.id}`);
+			if(user_type == "Students") {
+				discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Failed to update permissions for https://notion.so/bt5/${user.properties['First Name'].title[0].plain_text}-${user.id}`);
+			}
+			else {
+				discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Failed to update permissions for https://notion.so/bt5/${user.properties['Name'].title[0].plain_text}-${user.id}`);
+			}
+			console.log(err);
 		}
 	};
 };
