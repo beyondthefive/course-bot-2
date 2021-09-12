@@ -43,6 +43,12 @@ async function update_users(notion, database_id, user_type) {
 		      "select": {
 		        "equals": "ACCEPTED"
 		      }
+		    },
+		    {
+		      	"property": "In Credit Limit",
+				"text": {
+					"does_not_contain": "X" // no idea why "contains": "👍" doesn't work
+				}
 		    }
 		  			]
 				}

@@ -10,8 +10,10 @@
   "license": "ISC",
   "dependencies": {
     "@notionhq/client": "^0.2.4",
+    "axios": "^0.21.4",
     "discord.js": "^13.1.0",
     "dotenv": "^10.0.0",
+    "mailersend": "^1.1.0",
     "winston": "^3.3.3"
   }
 }
