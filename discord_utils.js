@@ -2,7 +2,7 @@ const { Client : DiscordClient, Collection, Intents, Guild, GuildMember, Permiss
 
 const guild_id = "876513971191046194";
 const enrolled_id = "877798118094143519";
-const teacher_id = "879962880559181916";
+const teacher_id = "879962880559181916"; 
 
 async function update_channel_perms(client, uid, channel_ids, all_channel_ids, perms, other_channel_ids=[], other_perms=undefined, dept_ids=[]) { 
 	// channel_ids is an arr containing the channel IDs of the courses they should be in

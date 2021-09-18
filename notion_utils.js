@@ -25,7 +25,7 @@ async function get_records_with_other_data(notion, database_id, other_data, filt
     ...(!(filter == undefined) && {filter : filter}),
     ...(!(sorts == undefined) && {sorts : sorts})
   });
-  return [response, other_data];
+  return [response, other_data]; 
 };
 
 async function update_record(notion, page_id, new_values) {

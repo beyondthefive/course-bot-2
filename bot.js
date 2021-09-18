@@ -108,7 +108,6 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 
 			if(id == "Not Found") {
 				discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
-				console.log("1");
 				continue;
 			}
 			else {
@@ -131,7 +130,6 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		}
 		else if (user.properties['Discord ID'].rich_text.length == 0) {
 			discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
-			console.log("2");
 			continue;
 		};
 		
