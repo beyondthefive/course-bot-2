@@ -1,6 +1,8 @@
 const { Client : DiscordClient, Collection, Intents, Guild, GuildMember, Permissions } = require('discord.js');
 const { Client : NotionClient} = require("@notionhq/client");
-const winston = require('winston'); // (error) logging!
+const MailerSend = require("mailersend");
+const Recipient = require("mailersend").Recipient;
+const EmailParams = require("mailersend").EmailParams;
 const notion_utils = require('./notion_utils');
 const discord_utils = require('./discord_utils');
 const fs = require('fs');
@@ -9,6 +11,12 @@ require('dotenv').config();
 const notion = new NotionClient({
   auth: process.env.notion_key,
 });
+
+
+const mailersend = new MailerSend({
+    api_key: process.env.mailersend_key,
+});
+
 
 
 const client = new DiscordClient({ intents: [Intents.FLAGS.GUILDS] });
@@ -38,10 +46,10 @@ async function update_users(notion, database_id, user_type) {
 		        "equals": true
 		      }
 		    },
-		    {
+		    { 
 		      "property": "Application Status",
 		      "select": {
-		        "equals": "ACCEPTED"
+		        "is_not_empty": true
 		      }
 		    },
 		    {
@@ -101,17 +109,48 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 	for (user of response.results) {
 		try {
 
+
+		if(user_type == "Students") {
+			emailed = user.properties["Emailed"].checkbox;
+			application_status = user.properties['Application Status'].select.name;
+			self_enrollment_links = get_self_enrollment_links(user);
+			if(application_status == "REJECTED" && !emailed) { // and not emailed yet
+				await send_student_email(user, false);
+				await sleep(250);
+				notion_utils.update_record(notion, user.id, {
+					"Emailed" : {
+						checkbox: true
+					}
+				});
+			}
+			else if(application_status == "ACCEPTED" && !emailed) { // and not emailed yet
+				await send_student_email(user, true, self_enrollment_links=self_enrollment_links)
+				await sleep(250);
+				notion_utils.update_record(notion, user.id, {
+					"Emailed" : {
+						checkbox: true
+					}
+				});
+				continue;
+			}
+		}
+		else {
+			application_status = undefined;
+		}
+		
+		
+
 		user_id = "Default Value";
 		if(user.properties['Discord ID'].rich_text.length == 0 && user.properties['Valid Discord Username'].checkbox == true && user_type == "Instructors") {
 			username = user.properties['Discord Username'].rich_text[0].plain_text;
 			id = await discord_utils.get_id_from_user(client, username); // actually nvm just do the search and match in this function
 
 			if(id == "Not Found") {
-				discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
+				await discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
 				continue;
 			}
 			else {
-				notion_utils.update_record(notion, user.id, {
+				await notion_utils.update_record(notion, user.id, {
 				"Discord ID" : {
 					rich_text: [
 						{
@@ -129,7 +168,7 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 			};
 		}
 		else if (user.properties['Discord ID'].rich_text.length == 0) {
-			discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
+			await discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Invalid Discord Username ${username}, could not retrieve ID`);
 			continue;
 		};
 		
@@ -157,84 +196,78 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		};
 
 		// won't return anything if the user doesn't have a record in the other database
-		other_record = notion_utils.get_records_with_other_data(notion, other_id, [user_id, perms, other_perms, role, other_role, user], 
-		{ 
-  	"property": "Discord ID",
-	  "text": {
-	    "equals": user_id
-			  }
-		  }
-		);
-
-		other_record.then(async function handle_other(res) {
-
-			// hacky sol that i'll eventually clean up
-			other_record = res[0];
-			user_id = res[1][0];
-			perms = res[1][1];
-			other_perms = res[1][2];
-			role = res[1][3];
-			other_role = res[1][4];
-			user = res[1][5];
-
-			all_c = await get_all_channels(all_courses);
-
-			if(other_record.results.length == 1) {
-				channel_arr = await get_channels_to_be_in(user, user_type, other_record=other_record);
-				main = channel_arr[0];
-				others = channel_arr[1];
-				dept = channel_arr[2];
-				lists_ready = Promise.all([main, all_c, dept, others]);
+		other_record = await notion_utils.get_records(notion, other_id, 
+			{ 
+		"property": "Discord ID",
+		"text": {
+			"equals": user_id
+				}
 			}
-			else if(user_type == "Instructors") {
-				channel_arr = await get_channels_to_be_in(user, user_type);
-				main = channel_arr[0];
-				dept = channel_arr[1];
-				lists_ready = Promise.all([main, all_c, dept]);
-			}
-			else if(user_type == "Students") {
-				channel_arr = await get_channels_to_be_in(user, user_type);
-				main = channel_arr[0];
-				lists_ready = Promise.all([main, all_c]);
-			};
+			);
+		/*
+		// hacky sol that i'll eventually clean up
+		other_record = res[0];
+		user_id = res[1][0];
+		perms = res[1][1];
+		other_perms = res[1][2];
+		role = res[1][3];
+		other_role = res[1][4];
+		user = res[1][5];
+		*/
 
 
-			lists_ready.then(arr => {
-				channel_ids = arr[0];
-				all_courses_ids = arr[1];
+		all_c = await get_all_channels(all_courses);
 
-				if(arr.length == 3) { // instructor but not a student
-					dept_ids = arr[2];
-					discord_utils.update_channel_perms(client, user_id, channel_ids, all_courses_ids, perms, dept_ids=dept_ids);
-				}
-				else if (arr.length == 4) { // instructor that's also a student or student that's also an instructor
-					dept_ids = arr[2];
-					other_channel_ids = arr[3];
-					discord_utils.update_channel_perms(client, user_id, channel_ids, all_courses_ids, perms, other_channel_ids=other_channel_ids, 
-						other_perms=other_perms, dept_ids=dept_ids);
-				}
-				else { // student but not an instructor
-					discord_utils.update_channel_perms(client, user_id, channel_ids, all_courses_ids, perms);
-				}
+		if(other_record.results.length == 1) {
+			channel_arr = await get_channels_to_be_in(user, user_type, other_record=other_record);
+			main = channel_arr[0];
+			others = channel_arr[1];
+			dept = channel_arr[2];
+			arr = [main, all_c, dept, others]
+		}
+		else if(user_type == "Instructors") {
+			channel_arr = await get_channels_to_be_in(user, user_type);
+			main = channel_arr[0];
+			dept = channel_arr[1];
+			arr = [main, all_c, dept]
+		}
+		else if(user_type == "Students") {
+			channel_arr = await get_channels_to_be_in(user, user_type);
+			main = channel_arr[0];
+			arr = [main, all_c]
+		};
 
-				
-				discord_utils.check_for_role(client, user_id, role).then((has_role) => {
-					if(!has_role) { // checking for role first
-							discord_utils.add_role(client, user_id, role); 
-					};
-				});
-				discord_utils.check_for_role(client, user_id, other_role).then((has_role) => {
-					if(has_role && (arr.length == 3 || arr.length == 2)) { // removes role if their record was deleted
-							discord_utils.remove_role(client, user_id, other_role); 
-					};
-				});
+		channel_ids = arr[0];
+		all_courses_ids = arr[1];
+
+		if(arr.length == 3) { // instructor but not a student
+			dept_ids = arr[2];
+			await discord_utils.update_channel_perms(client, user_id, channel_ids, all_courses_ids, perms, dept_ids=dept_ids);
+		}
+		else if (arr.length == 4) { // instructor that's also a student or student that's also an instructor
+			dept_ids = arr[2];
+			other_channel_ids = arr[3];
+			await discord_utils.update_channel_perms(client, user_id, channel_ids, all_courses_ids, perms, other_channel_ids=other_channel_ids, 
+				other_perms=other_perms, dept_ids=dept_ids);
+		}
+		else { // student but not an instructor
+			await discord_utils.update_channel_perms(client, user_id, channel_ids, all_courses_ids, perms);
+		}
+
+		has_role_first = await discord_utils.check_for_role(client, user_id, role)	
+		if(!has_role_first) { // checking for role first
+				await discord_utils.add_role(client, user_id, role); 
+		};
+
+		has_role_second = await discord_utils.check_for_role(client, user_id, other_role)
+		if(has_role_second && (arr.length == 3 || arr.length == 2)) { // removes role if their record was deleted
+				await discord_utils.remove_role(client, user_id, other_role); 
+		};
 
 
-				//username = discord_utils.get_user_from_id(client, user_id);
-				//username.then(str => discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Successfully updated ${str}`)); 
+		//username = discord_utils.get_user_from_id(client, user_id);
+		//username.then(str => discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Successfully updated ${str}`)); 
 
-			});
-		});
 		}
 		catch(err) {
 			if(user_type == "Students") {
@@ -250,6 +283,7 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 
 async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 	try {
+
 
 	get_channels_to_be_in.channel_ids = [];
 	for (channel_id of user.properties['Course Channel IDs (Test)'].rollup.array) { 
@@ -369,3 +403,83 @@ async function get_all_channels(all_courses) {
 };
 
 
+function get_self_enrollment_links(user) {
+	try {
+		self_enrollment_links = []
+		for (item of user.properties["Self-Enrollment Links (Test)"].rollup.array) {
+			if(item["text"][0] !== undefined) {
+				self_enrollment_links.push(item["text"][0].plain_text);
+			}
+			
+		}
+		return self_enrollment_links;
+	}
+	catch(err) {
+		discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Failed to retrieve self-enrollment links for ${user.id} in ${user_type}`);
+	}
+}
+
+
+
+/*
+
+
+
+
+
+
+*/
+
+async function send_student_email(user, accepted, self_enrollment_links=undefined) { // accepted is a bool
+	email = user.properties["Email"].email;
+	first_name = user.properties["First Name"].title[0].plain_text;
+	courses = []
+	courses_unformatted = user.properties["Course Names (Test)"].rollup.array
+	for (i of courses_unformatted) {
+		courses.push(i.title[0].plain_text);
+	}
+
+	const recipients = [
+		new Recipient(email, first_name)
+	];
+
+	if(accepted) {
+		acceptance_msg = `dear ${first_name}, <br/> congrats, you've been accepted for the following courses: <br/>`
+		counter = 0
+		for (c of courses) {
+			acceptance_msg += `${c}: ${self_enrollment_links[counter]} <br/>`
+			counter++;
+		}
+		const emailParams = new EmailParams()
+			.setFrom("admissions-noreply@beyondthefive.org")
+			.setFromName("Beyond The Five Admissions")
+			.setRecipients(recipients)
+			.setSubject("Beyond The Five Admissions Update")
+			.setHtml(acceptance_msg)
+			.setText(acceptance_msg);
+		mailersend.send(emailParams);
+	}
+	else {
+		reason = user.properties["Reason (Rejection)"].rich_text[0].plain_text;
+		rejection_msg = `dear ${first_name} <br/> here's why you were rejected: <br/> ${reason}`
+		const emailParams = new EmailParams()
+			.setFrom("admissions-noreply@beyondthefive.org")
+			.setFromName("Beyond The Five Admissions")
+			.setRecipients(recipients)
+			.setSubject("Beyond The Five Admissions Update")
+			.setHtml(rejection_msg)
+			.setText(rejection_msg);
+		mailersend.send(emailParams);
+	}
+
+	//console.log("made it here");
+	
+	
+}; 
+
+
+function sleep(ms) {
+	return new Promise((resolve) => {
+	  setTimeout(resolve, ms);
+	});
+  }

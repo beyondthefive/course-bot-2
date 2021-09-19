@@ -1,6 +1,7 @@
 const discord_utils = require('./discord_utils');
 
 async function get_records(notion, database_id, filter = undefined, sorts = undefined) { 
+	try {
 	// filter (object, see docs) specifies which records to get (most common use case is getting only the records w/ the "NEED BOT TO UPDATE" property checked)
 	// sorts (array of sort objects, see docs) orders the pages in the returned object according to specified properties
 
@@ -11,11 +12,17 @@ async function get_records(notion, database_id, filter = undefined, sorts = unde
     ...(!(sorts == undefined) && {sorts : sorts})
   });
   return response;
+ }
+ catch(err) {
+	console.log(`Failed to retrieve records from ${database_id}`);
+ }
+
 };
 
 // just for passing data into the .then() scope within a loop
 // hacky sol, will find a cleaner way to do this eventually
 async function get_records_with_other_data(notion, database_id, other_data, filter = undefined, sorts = undefined) { 
+	try {
 	// filter (object, see docs) specifies which records to get (most common use case is getting only the records w/ the "NEED BOT TO UPDATE" property checked)
 	// sorts (array of sort objects, see docs) orders the pages in the returned object according to specified properties
 
@@ -25,16 +32,25 @@ async function get_records_with_other_data(notion, database_id, other_data, filt
     ...(!(filter == undefined) && {filter : filter}),
     ...(!(sorts == undefined) && {sorts : sorts})
   });
-  return [response, other_data]; 
+  return [response, other_data];  s
+	}
+	catch(err) {
+		console.log(`Failed to retrieve records from ${database_id} with other data`);
+	}
 };
 
 async function update_record(notion, page_id, new_values) {
+	try {
 	// new_values is an object that specifies each of the properties to be updated w/ their new values--see docs
 	const response = await notion.pages.update({
 			page_id : page_id,
 			properties : new_values
 		});
 	return response; 
+	}
+	catch(err) {
+		console.log(`Failed to update record ${page_id}`);
+	}
 };
 
 
