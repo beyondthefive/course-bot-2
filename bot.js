@@ -182,15 +182,15 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		// the other channels that they should be in
 		if(user_type == "Students") {
 			other_id = notion_utils.instructors_id;
-			perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true};
-			other_perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true, MANAGE_MESSAGES : true};
+			perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true, READ_MESSAGE_HISTORY : true};
+			other_perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true, MANAGE_MESSAGES : true, READ_MESSAGE_HISTORY : true};
 			role = discord_utils.enrolled_id;
 			other_role = discord_utils.teacher_id;
 		}
 		else {
 			other_id = notion_utils.students_id;
-			perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true, MANAGE_MESSAGES : true};
-			other_perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true};
+			perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true, MANAGE_MESSAGES : true, READ_MESSAGE_HISTORY : true};
+			other_perms = { VIEW_CHANNEL: true, SEND_MESSAGES : true, READ_MESSAGE_HISTORY : true};
 			role = discord_utils.teacher_id;
 			other_role = discord_utils.enrolled_id;
 		};
