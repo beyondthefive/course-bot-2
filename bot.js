@@ -109,7 +109,7 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 	for (user of response.results) {
 		try {
 
-		console.log(user);
+		//console.log(user);
 
 		if(user_type == "Students") {
 			emailed = user.properties["Emailed"].checkbox;
@@ -426,6 +426,9 @@ async function send_student_email(user, accepted, self_enrollment_links=undefine
 	courses = []
 	courses_unformatted = user.properties["Course Names"].rollup.array
 
+	//console.log(courses_unformatted);
+	//console.log(self_enrollment_links);
+
 	for (i of courses_unformatted) {
 		courses.push(i.title[0].plain_text);
 	}
@@ -453,7 +456,7 @@ async function send_student_email(user, accepted, self_enrollment_links=undefine
 	}
 	else {
 		reason = user.properties["Reason (Rejection)"].rich_text[0].plain_text;
-		rejection_msg = `Dear ${first_name} <br/><br/> We regret to inform you that your course requests at Beyond The Five have been rejected. ${reason}<br/><br/>You are able to reapply by completing the application again in the Discord server.<br/><br/>If you have any questions or concerns, please do not hesitate to reach out to the staff team by emailing admissions@beyondthefive.org.<br/><br/>Thank you for your interest in Beyond The Five.<br/><br/>Beyond The Five Admissions Team`
+		rejection_msg = `Dear ${first_name}, <br/><br/> We regret to inform you that your course requests at Beyond The Five have been rejected. ${reason}<br/><br/>You are able to reapply by completing the application again in the Discord server.<br/><br/>If you have any questions or concerns, please do not hesitate to reach out to the staff team by emailing admissions@beyondthefive.org.<br/><br/>Thank you for your interest in Beyond The Five.<br/><br/>Beyond The Five Admissions Team`
 		const emailParams = new EmailParams()
 			.setFrom("admissions-noreply@beyondthefive.org")
 			.setFromName("Beyond The Five Admissions")
