@@ -109,6 +109,7 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 	for (user of response.results) {
 		try {
 
+		console.log(user);
 
 		if(user_type == "Students") {
 			emailed = user.properties["Emailed"].checkbox;
@@ -117,7 +118,7 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 			if(application_status == "REJECTED" && !emailed) { // and not emailed yet
 				await send_student_email(user, false);
 				await sleep(250);
-				notion_utils.update_record(notion, user.id, {
+				await notion_utils.update_record(notion, user.id, {
 					"Emailed" : {
 						checkbox: true
 					}
@@ -126,7 +127,7 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 			else if(application_status == "ACCEPTED" && !emailed) { // and not emailed yet
 				await send_student_email(user, true, self_enrollment_links=self_enrollment_links)
 				await sleep(250);
-				notion_utils.update_record(notion, user.id, {
+				await notion_utils.update_record(notion, user.id, {
 					"Emailed" : {
 						checkbox: true
 					}
@@ -137,7 +138,6 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		else {
 			application_status = undefined;
 		}
-		
 		
 
 		user_id = "Default Value";
@@ -204,16 +204,15 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 				}
 			}
 			);
-		/*
 		// hacky sol that i'll eventually clean up
-		other_record = res[0];
-		user_id = res[1][0];
-		perms = res[1][1];
-		other_perms = res[1][2];
-		role = res[1][3];
-		other_role = res[1][4];
-		user = res[1][5];
-		*/
+		//other_record = res[0];
+		//user_id = res[1][0];
+		//perms = res[1][1];
+		//other_perms = res[1][2];
+		//role = res[1][3];
+		//other_role = res[1][4];
+		//user = res[1][5];
+		
 
 
 		all_c = await get_all_channels(all_courses);
@@ -286,7 +285,7 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 
 
 	get_channels_to_be_in.channel_ids = [];
-	for (channel_id of user.properties['Course Channel IDs (Test)'].rollup.array) { 
+	for (channel_id of user.properties['Course Channel IDs'].rollup.array) { 
 		get_channels_to_be_in.channel_ids.push(channel_id.text[0].plain_text);
 	};
 
@@ -299,7 +298,7 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 	// get dept ids here
 	if(user_type == "Instructors") {
 
-		for (channel_id of user.properties['Course Channel IDs (Test)'].rollup.array) { 
+		for (channel_id of user.properties['Course Channel IDs'].rollup.array) { 
 			filter["or"].push({
 				"property" : "Channel ID",
 				"text" : {
@@ -323,7 +322,7 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 
 			if (typeof other_record !== 'undefined') { // add student channel ids here
 				student_channels = [];
-				for(ch_id of other_record.results[0].properties['Course Channel IDs (Test)'].rollup.array) {
+				for(ch_id of other_record.results[0].properties['Course Channel IDs'].rollup.array) {
 					student_channels.push(ch_id.text[0].plain_text);
 				};
 
@@ -340,13 +339,13 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 
 	if(user_type == "Students" && typeof other_record !== 'undefined') {
 		instructor_channels = []
-		for(ch_id of other_record.results[0].properties['Course Channel IDs (Test)'].rollup.array) {
+		for(ch_id of other_record.results[0].properties['Course Channel IDs'].rollup.array) {
 			instructor_channels.push(ch_id.text[0].plain_text);
 		};
 		//get_channels_to_be_in.channel_ids.push(...instructor_channels);
 
 		// also get dept ids here
-		for (channel_id of other_record.results[0].properties['Course Channel IDs (Test)'].rollup.array) { 
+		for (channel_id of other_record.results[0].properties['Course Channel IDs'].rollup.array) { 
 			filter["or"].push({
 				"property" : "Channel ID",
 				"text" : {
@@ -406,7 +405,7 @@ async function get_all_channels(all_courses) {
 function get_self_enrollment_links(user) {
 	try {
 		self_enrollment_links = []
-		for (item of user.properties["Self-Enrollment Links (Test)"].rollup.array) {
+		for (item of user.properties["Self-Enrollment Links"].rollup.array) {
 			if(item["text"][0] !== undefined) {
 				self_enrollment_links.push(item["text"][0].plain_text);
 			}
@@ -421,20 +420,12 @@ function get_self_enrollment_links(user) {
 
 
 
-/*
-
-
-
-
-
-
-*/
-
 async function send_student_email(user, accepted, self_enrollment_links=undefined) { // accepted is a bool
 	email = user.properties["Email"].email;
 	first_name = user.properties["First Name"].title[0].plain_text;
 	courses = []
-	courses_unformatted = user.properties["Course Names (Test)"].rollup.array
+	courses_unformatted = user.properties["Course Names"].rollup.array
+
 	for (i of courses_unformatted) {
 		courses.push(i.title[0].plain_text);
 	}
@@ -444,29 +435,30 @@ async function send_student_email(user, accepted, self_enrollment_links=undefine
 	];
 
 	if(accepted) {
-		acceptance_msg = `dear ${first_name}, <br/> congrats, you've been accepted for the following courses: <br/>`
+		acceptance_msg = `Dear ${first_name}, <br/><br/>We are happy to inform you that you have been approved to take:<br/>`
 		counter = 0
 		for (c of courses) {
 			acceptance_msg += `${c}: ${self_enrollment_links[counter]} <br/>`
 			counter++;
 		}
+		acceptance_msg += `in the 2021-22 school year!<br/><br/>You should now have access to the channels of your classes on our discord, where you may meet your fellow students and instructor.<br/><br/>Please enroll in your courses on Canvas using the links above.<br/><br/>Before getting started, be sure to watch the video introduction to the Canvas course system, as that is where all courses at Beyond The Five are held: https://youtu.be/x3j8V-uLkNw.<br/><br/>Many of your questions should be answered in Beyond The Five's FAQs, viewable here: https://bit.ly/3nOXsHM.<br/><br/>If you have any questions or concerns, please do not hesitate to reach out to the staff team by emailing admissions@beyondthefive.org.<br/><br/>Beyond The Five Admissions Team`
 		const emailParams = new EmailParams()
 			.setFrom("admissions-noreply@beyondthefive.org")
 			.setFromName("Beyond The Five Admissions")
 			.setRecipients(recipients)
-			.setSubject("Beyond The Five Admissions Update")
+			.setSubject("Re: Beyond The Five Admissions Update")
 			.setHtml(acceptance_msg)
 			.setText(acceptance_msg);
 		mailersend.send(emailParams);
 	}
 	else {
 		reason = user.properties["Reason (Rejection)"].rich_text[0].plain_text;
-		rejection_msg = `dear ${first_name} <br/> here's why you were rejected: <br/> ${reason}`
+		rejection_msg = `Dear ${first_name} <br/><br/> We regret to inform you that your course requests at Beyond The Five have been rejected. ${reason}<br/><br/>You are able to reapply by completing the application again in the Discord server.<br/><br/>If you have any questions or concerns, please do not hesitate to reach out to the staff team by emailing admissions@beyondthefive.org.<br/><br/>Thank you for your interest in Beyond The Five.<br/><br/>Beyond The Five Admissions Team`
 		const emailParams = new EmailParams()
 			.setFrom("admissions-noreply@beyondthefive.org")
 			.setFromName("Beyond The Five Admissions")
 			.setRecipients(recipients)
-			.setSubject("Beyond The Five Admissions Update")
+			.setSubject("Re: Beyond The Five Admissions Update")
 			.setHtml(rejection_msg)
 			.setText(rejection_msg);
 		mailersend.send(emailParams);

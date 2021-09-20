@@ -77,7 +77,7 @@ async function get_block(notion, block_id, get_subblocks=false) {
 module.exports = {
 	students_id: "3fa8f9caeccd42a1ad5125193c9aa300",
 	instructors_id: "84103a7ceaac47288c73010520bbed0b",
-	courses_id: "75c3e78c93a04ba0828d4649ca51c49d",
+	courses_id: "75c3e78c93a04ba0828d4649ca51c49d", // needs to be updated 
 	subjects_id: "daab30bf6f7445228189a4dc416d7e6a",
 	get_records: get_records,
 	get_records_with_other_data: get_records_with_other_data,
