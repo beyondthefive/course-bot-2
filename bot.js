@@ -218,6 +218,7 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		all_c = await get_all_channels(all_courses);
 
 		if(other_record.results.length == 1) {
+			console.log("found the other one")
 			channel_arr = await get_channels_to_be_in(user, user_type, other_record=other_record);
 			main = channel_arr[0];
 			others = channel_arr[1];
@@ -238,6 +239,8 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 
 		channel_ids = arr[0];
 		all_courses_ids = arr[1];
+
+		console.log(channel_ids);
 
 		if(arr.length == 3) { // instructor but not a student
 			dept_ids = arr[2];
@@ -283,10 +286,11 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 	try {
 
+	return_list = []
 
-	get_channels_to_be_in.channel_ids = [];
+	channel_ids = [];
 	for (channel_id of user.properties['Course Channel IDs'].rollup.array) { 
-		get_channels_to_be_in.channel_ids.push(channel_id.text[0].plain_text);
+		channel_ids.push(channel_id.text[0].plain_text);
 	};
 
 	filter = {
@@ -307,34 +311,37 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 			});
 		};
 
-		courses_in = notion_utils.get_records(notion, notion_utils.courses_id, filter=filter);
-		return_list = courses_in.then(courses_in => {
-			dept_channel_ids = new Set();
-			for(course of courses_in.results) {
-				for(dept_id of course.properties["Department Channel IDs"].rollup.array) {
-					dept_channel_ids.add(dept_id.text[0].plain_text);
-				};
+		console.log(user.properties['Course Channel IDs'].rollup.array)
+
+		
+
+		courses_in = await notion_utils.get_records(notion, notion_utils.courses_id, filter=filter);
+		dept_channel_ids = new Set();
+		for(course of courses_in.results) {
+			for(dept_id of course.properties["Department Channel IDs"].rollup.array) {
+				dept_channel_ids.add(dept_id.text[0].plain_text);
+			};
+		};
+
+		dept_channel_ids = Array.from(dept_channel_ids);
+		
+		//get_channels_to_be_in.channel_ids.push(...dept_channel_ids);
+
+		if (typeof other_record !== 'undefined') { // add student channel ids here
+			student_channels = [];
+			for(ch_id of other_record.results[0].properties['Course Channel IDs'].rollup.array) {
+				student_channels.push(ch_id.text[0].plain_text);
 			};
 
-			dept_channel_ids = Array.from(dept_channel_ids);
+			//get_channels_to_be_in.channel_ids.push(...student_channels);
+			return_list = [channel_ids, student_channels, dept_channel_ids];
+		}
+		else {
+			return_list = [channel_ids, dept_channel_ids];
+		};
 			
-			//get_channels_to_be_in.channel_ids.push(...dept_channel_ids);
 
-			if (typeof other_record !== 'undefined') { // add student channel ids here
-				student_channels = [];
-				for(ch_id of other_record.results[0].properties['Course Channel IDs'].rollup.array) {
-					student_channels.push(ch_id.text[0].plain_text);
-				};
-
-				//get_channels_to_be_in.channel_ids.push(...student_channels);
-				return [get_channels_to_be_in.channel_ids, student_channels, dept_channel_ids];
-			}
-			else {
-				return [get_channels_to_be_in.channel_ids, dept_channel_ids];
-			};
-			
-		});
-		return return_list;
+		
 	};
 
 	if(user_type == "Students" && typeof other_record !== 'undefined') {
@@ -354,34 +361,33 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 			});
 		};
 
-		courses_in = notion_utils.get_records(notion, notion_utils.courses_id, filter=filter);
-		return_list = courses_in.then(courses_in => {
-			dept_channel_ids = new Set();
-			for(course of courses_in.results) {
-				for(dept_id of course.properties["Department Channel IDs"].rollup.array) {
-					dept_channel_ids.add(dept_id.text[0].plain_text);
-				};
+		courses_in = await notion_utils.get_records(notion, notion_utils.courses_id, filter=filter);
+		dept_channel_ids = new Set();
+		for(course of courses_in.results) {
+			for(dept_id of course.properties["Department Channel IDs"].rollup.array) {
+				dept_channel_ids.add(dept_id.text[0].plain_text);
 			};
+		};
 
-			dept_channel_ids = Array.from(dept_channel_ids);
+		dept_channel_ids = Array.from(dept_channel_ids);
 
-			//instructor_channels.push(...dept_channel_ids);
+		//instructor_channels.push(...dept_channel_ids);
 
 
-			//get_channels_to_be_in.channel_ids.push(...dept_channel_ids);
-			return [get_channels_to_be_in.channel_ids, instructor_channels, dept_channel_ids];
-		});
-
-		return return_list;
+		//get_channels_to_be_in.channel_ids.push(...dept_channel_ids);
+		return_list = [channel_ids, instructor_channels, dept_channel_ids];
 
 	} 
 	else if (user_type == "Students"){
-		courses_in = notion_utils.get_records(notion, notion_utils.courses_id, filter=filter);
-		return_list = courses_in.then(courses_in => { // can't have a plain return statement, so have to use some kind of promise
-			return [get_channels_to_be_in.channel_ids];
-		});
-		return return_list;
+		courses_in = await notion_utils.get_records(notion, notion_utils.courses_id, filter=filter);
+		return_list = [channel_ids];
+
 	};
+
+	console.log(return_list);
+
+	return return_list;
+
 	}
 	catch(err) {
 		discord_utils.send_message_to_channel(client, discord_utils.log_channel_id, `Encountered error while retrieving channel IDs for record ${user.id} in ${user_type}`);
@@ -389,7 +395,7 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 };
 
 
-async function get_all_channels(all_courses) {
+function get_all_channels(all_courses) {
 
 	all_courses_ids = []; // an arr containing the ids of all of our courses
 	for (course of all_courses.results) {
