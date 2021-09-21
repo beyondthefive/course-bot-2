@@ -240,7 +240,7 @@ async function update_perms_and_roles(all_courses, response, database_id, user_t
 		channel_ids = arr[0];
 		all_courses_ids = arr[1];
 
-		console.log(channel_ids);
+		//console.log(channel_ids);
 
 		if(arr.length == 3) { // instructor but not a student
 			dept_ids = arr[2];
@@ -311,7 +311,7 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 			});
 		};
 
-		console.log(user.properties['Course Channel IDs'].rollup.array)
+		//console.log(user.properties['Course Channel IDs'].rollup.array)
 
 		
 
@@ -384,7 +384,7 @@ async function get_channels_to_be_in(user, user_type, other_record=undefined) {
 
 	};
 
-	console.log(return_list);
+	//console.log(return_list);
 
 	return return_list;
 
